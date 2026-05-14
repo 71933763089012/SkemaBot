@@ -1,0 +1,18 @@
+{
+  "name": "SkemaBot",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "riddance-watch"
+  },
+  "dependencies": {
+    "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "@riddance/env": "0.9.9",
+    "@types/node": "^22.19.19"
+  }
+}
