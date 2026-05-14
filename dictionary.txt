@@ -1,2 +1,0 @@
-networkidle
-retur
