@@ -1,20 +1,3 @@
-import fs from 'node:fs/promises'
-import { fetchSchedule } from '../schedule.js'
-type Data = [
-    {
-        cookie: { value: string; experation: number } | undefined
-        username: string
-        password: string
-    },
-]
+import { fetchAllSchedule } from '../schedule.js'
 
-const text = await fs.readFile('./data.json')
-const data = JSON.parse(text.toString()) as Data
-
-const schedule = await fetchSchedule(
-    { name: data[0].username, password: data[0].password },
-    '2026-04-23',
-    data[0].cookie,
-)
-
-console.log(schedule)
+console.log(await fetchAllSchedule('2026-04-23'))

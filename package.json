@@ -9,11 +9,13 @@
     "start": "riddance-watch"
   },
   "dependencies": {
+    "express": "^5.2.1",
     "node-html-parser": "^7.1.0",
     "playwright": "^1.60.0"
   },
   "devDependencies": {
     "@riddance/env": "0.9.9",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.19.19"
   }
 }
