@@ -11,9 +11,8 @@ export function htmlToDiscord(html: string): string {
     })
 
     function render(node: Node): string {
-        // Text node
         if (node instanceof TextNode) {
-            return normalizeWhitespace(node.rawText)
+            return node.rawText.replaceAll(/\s+/gu, ' ')
         }
 
         if (!(node instanceof HTMLElement)) {
@@ -22,16 +21,10 @@ export function htmlToDiscord(html: string): string {
 
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const tag = node.tagName?.toLowerCase()
-
-        const elChildren = node.childNodes.map(render).join('')
-
-        // IMPORTANT: guard against null/undefined tagName
-        if (!tag) {
-            return elChildren
-        }
-
-        // Render children first (recursive)
         const children = node.childNodes.map(render).join('')
+        if (!tag) {
+            return children
+        }
 
         switch (tag) {
             // Bold
@@ -54,8 +47,11 @@ export function htmlToDiscord(html: string): string {
             case 'del':
                 return wrap(children, '~~')
 
-            // Inline code
+            // Code
             case 'code':
+                if (children.trim().includes('\n')) {
+                    return `\n\`\`\`\n${children.trim()}\n\`\`\`\n`
+                }
                 return `\`${children.trim()}\``
 
             // Code block
@@ -67,14 +63,12 @@ export function htmlToDiscord(html: string): string {
                 const href = node.getAttribute('href')
                 const text = children.trim()
 
-                if (!href) {
+                if (!href || text === href) {
                     return text
                 }
 
-                // Discord doesn't support markdown links everywhere,
-                // so we append the URL.
-                if (text && text !== href) {
-                    return `${text} (${href})`
+                if (isWebAddress(href)) {
+                    return `[${text}](${/^https:\/\/|^http:\/\//u.test(href) ? href : 'https://' + href})`
                 }
 
                 return href
@@ -86,7 +80,7 @@ export function htmlToDiscord(html: string): string {
 
             // List item
             case 'li':
-                return `• ${children.trim()}\n`
+                return `* ${children.trim()}\n`
 
             // Lists
             case 'ul':
@@ -105,7 +99,7 @@ export function htmlToDiscord(html: string): string {
             case 'blockquote':
             case 'table':
             case 'tr':
-                return block(children)
+                return wrap(children, '\n')
 
             // Headings
             case 'h1':
@@ -122,19 +116,12 @@ export function htmlToDiscord(html: string): string {
             case 'h6':
                 return `**${children.trim()}**\n`
 
-            // Default:
-            // Just recursively render children
             default:
                 return children
         }
     }
 
-    let result = render(root)
-
-    // Final cleanup
-    result = cleanup(result)
-
-    return result
+    return cleanup(render(root))
 }
 
 /**
@@ -151,32 +138,7 @@ function wrap(text: string, wrapper: string): string {
 }
 
 /**
- * Handles block-level spacing safely.
- *
- * Prevents nested divs from generating:
- * \n\n\n\n\ntext
- *
- * Instead collapses into a single clean block separation.
- */
-function block(text: string): string {
-    const trimmed = text.trim()
-
-    if (!trimmed) {
-        return ''
-    }
-
-    return `\n${trimmed}\n`
-}
-
-/**
- * Normalizes text whitespace while preserving meaningful spaces.
- */
-function normalizeWhitespace(text: string): string {
-    return text.replaceAll(/\s+/gu, ' ')
-}
-
-/**
- * Cleans up excessive whitespace/newlines globally.
+ * Cleans up excessive whitespace/newlines.
  */
 function cleanup(text: string): string {
     return (
@@ -193,4 +155,14 @@ function cleanup(text: string): string {
             // Trim final output
             .trim()
     )
+}
+
+function isWebAddress(str: string): boolean {
+    try {
+        return new URL(
+            /^https:\/\/|^http:\/\//u.test(str) ? str : `https://${str}`,
+        ).hostname.includes('.')
+    } catch {
+        return false
+    }
 }
