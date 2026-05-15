@@ -1,24 +1,24 @@
-import { chromium } from 'playwright'
+import fs from 'node:fs/promises'
+import { chromium, type BrowserContext, type Page } from 'playwright'
 
 export async function fetchSchedule(
-    cookie: { value: string; experation: number },
+    user: { name: string; password: string },
     date: string,
+    cookie?: { value: string; experation: number },
 ): Promise<Class[]> {
     const URL = 'https://all.uddataplus.dk/skema/?id=id_menu_skema#u:e!122922!' + date
 
-    const browser = await chromium.launch({ headless: true })
+    const browser = await chromium.launch({
+        headless: true,
+        args: [
+            '--disable-features=BlockThirdPartyCookies',
+            '--disable-features=SameSiteByDefaultCookies',
+            '--disable-features=CookiesWithoutSameSiteMustBeSecure',
+        ],
+    })
     const context = await browser.newContext()
+    const page = await context.newPage()
     await context.addCookies([
-        {
-            name: 'utoken',
-            value: cookie.value,
-            domain: 'all.uddataplus.dk',
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'Lax',
-            expires: cookie.experation,
-        },
         {
             name: 'instkey',
             value: '630064991',
@@ -38,14 +38,26 @@ export async function fetchSchedule(
             sameSite: 'Lax',
         },
     ])
+    cookie ??= await updateCookie(user.name, user.password, page, context)
+    await context.addCookies([
+        {
+            name: 'utoken',
+            value: cookie.value,
+            domain: 'all.uddataplus.dk',
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'Lax',
+            expires: cookie.experation,
+        },
+    ])
 
-    const page = await context.newPage()
     await page.goto(URL, { waitUntil: 'networkidle' })
     if (page.url().includes('&returURL=')) {
-        throw new Error('Invalid Cookie!')
-    }
-    if (page.url() !== URL) {
-        throw new Error(`Unknown Error. Mismatched URL: ${URL}`)
+        cookie = await updateCookie(user.name, user.password, page, context)
+        await page.goto(URL, { waitUntil: 'networkidle' })
+    } else if (page.url() !== URL) {
+        throw new Error(`Unknown Error. Mismatched URL: ${page.url()}`)
     }
     await page.waitForSelector('svg', { timeout: 15_000 })
 
@@ -164,6 +176,99 @@ export async function fetchSchedule(
     return info
 }
 
+export async function login(username: string, password: string, page: Page) {
+    await page.goto('https://all.uddataplus.dk/login/')
+    await page.locator('input#huskmig').waitFor()
+    await page.locator('label[for="huskmig"]').click()
+    await Promise.all([
+        page.waitForURL(/broker\.unilogin\.dk/u, {
+            timeout: 10_000,
+        }),
+        page.locator('button#unilogin').click(),
+    ])
+
+    await page.locator('button.button-secondary').first().waitFor()
+    const buttons = page.locator('button.button-secondary')
+    const count = await buttons.count()
+    for (let i = 0; i < count; i++) {
+        const button = buttons.nth(i)
+        const hasUniLogin = (await button.locator('img[alt="Unilogin"]').count()) > 0
+        if (hasUniLogin) {
+            await Promise.all([
+                page.waitForURL(/idp\.unilogin\.dk/u, {
+                    timeout: 10_000,
+                }),
+                button.click(),
+            ])
+            break
+        }
+    }
+
+    await page.locator('input#username').waitFor()
+    await page.locator('input#username').fill(username)
+    await page.locator('button.button-primary.js-cta-submit').click()
+
+    await page.locator('input[type="password"]').waitFor({
+        timeout: 10_000,
+    })
+    await page.locator('input[type="password"]').waitFor()
+    await page.locator('input[type="password"]').fill(password)
+    await Promise.all([
+        page.waitForURL(/all\.uddataplus\.dk\/skema/u, {
+            timeout: 10_000,
+        }),
+        page.locator('button.button-primary.js-cta-submit').click(),
+    ])
+}
+
+async function updateCookie(
+    username: string,
+    password: string,
+    cookie: { value: string; experation: number },
+): Promise<{ value: string; experation: number }>
+async function updateCookie(
+    username: string,
+    password: string,
+    page: Page,
+    context: BrowserContext,
+): Promise<{ value: string; experation: number }>
+async function updateCookie(
+    username: string,
+    password: string,
+    cookiePage: { value: string; experation: number } | Page,
+    context?: BrowserContext,
+): Promise<{ value: string; experation: number }> {
+    if (context) {
+        await login(username, password, cookiePage as Page)
+        const newCookie = (await context.cookies()).find(c => c.name === 'utoken')
+        if (!newCookie) {
+            throw new Error('Failed Login')
+        }
+        const text = await fs.readFile('./data.json')
+        const data = JSON.parse(text.toString()) as Data[]
+        const user = data.find(u => u.username === username && u.password === password)
+        if (!user) {
+            throw new Error("Couldn't find user")
+        }
+        user.cookie = {
+            experation: newCookie.expires,
+            value: newCookie.value,
+        }
+        await fs.writeFile('./data.json', JSON.stringify(data))
+        return user.cookie
+    } else {
+        const text = await fs.readFile('./data.json')
+        const data = JSON.parse(text.toString()) as Data[]
+        const user = data.find(d => d.username === username && d.password === password)
+        if (!user) {
+            throw new Error("Couldn't find user")
+        }
+        user.cookie = cookiePage as { value: string; experation: number }
+        await fs.writeFile('./data.json', JSON.stringify(data))
+        return user.cookie
+    }
+}
+
 class Class {
     time: string | undefined = undefined
     teachers: string[] = []
@@ -175,4 +280,10 @@ class Class {
     remarks: string | undefined = undefined
     files: string[] = []
     fileUrls: string[] = []
+}
+
+type Data = {
+    cookie: { value: string; experation: number }
+    username: string
+    password: string
 }
