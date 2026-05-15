@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import { chromium, type BrowserContext, type Page } from 'playwright'
+import { htmlToDiscord } from './discord.js'
 
 export async function fetchSchedule(
     user: { name: string; password: string },
@@ -124,12 +125,16 @@ export async function fetchSchedule(
                 switch (await popupInfos.nth(k).locator('label.control-label').textContent()) {
                     case 'Note':
                         if ((await relevant.locator('div.gwt-HTML > *').count()) > 0) {
-                            c.notes = await relevant.locator('div.gwt-HTML').innerHTML()
+                            c.notes = htmlToDiscord(
+                                await relevant.locator('div.gwt-HTML').innerHTML(),
+                            )
                         }
                         break
                     case 'Lektie':
                         if ((await relevant.locator('div.gwt-HTML > *').count()) > 0) {
-                            c.homework = await relevant.locator('div.gwt-HTML').innerHTML()
+                            c.homework = htmlToDiscord(
+                                await relevant.locator('div.gwt-HTML').innerHTML(),
+                            )
                         }
                         break
                     case 'Filer': {
