@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises'
-import { fetchSchedule } from '../skema.js'
+import { fetchSchedule } from '../schedule.js'
 type Data = [
     {
         cookie: { value: string; experation: number } | undefined
