@@ -1,7 +1,10 @@
 /* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import express from 'express'
-import { fetchAllSchedule } from './schedule.js'
+import fs from 'node:fs/promises'
+import { chromium } from 'playwright'
+import { fetchAllSchedule, updateCookie } from './schedule.js'
+
 const app = express()
 const port = 3000
 app.use(express.json())
@@ -29,6 +32,62 @@ app.post('/get', async (req, res) => {
         res.send('Invalid Body')
     }
 })
+
+// add user
+app.post('/get', async (req, res) => {
+    const { username, password } = req.body
+    if (username && password) {
+        const context = await (
+            await chromium.launch({
+                headless: true,
+                args: [
+                    '--disable-features=BlockThirdPartyCookies',
+                    '--disable-features=SameSiteByDefaultCookies',
+                    '--disable-features=CookiesWithoutSameSiteMustBeSecure',
+                ],
+            })
+        ).newContext()
+        let data: Data | undefined
+        try {
+            data = {
+                username,
+                password,
+                cookie: await updateCookie(
+                    username as string,
+                    password as string,
+                    await context.newPage(),
+                    context,
+                ),
+            }
+        } catch {
+            res.status(400)
+            res.send('Login failed (Propably Invalid username or password)')
+        }
+        if (data) {
+            await fs.writeFile(
+                './data.json',
+                JSON.stringify(
+                    (JSON.parse((await fs.readFile('./data.json')).toString()) as Data[]).push(
+                        data,
+                    ),
+                ),
+            )
+            res.status(200)
+            res.send('Succesfully added user')
+        }
+        res.status(400)
+        res.send('You have succesfully reached an impossible Error, congrats!')
+    } else {
+        res.status(400)
+        res.send('Invalid Body')
+    }
+})
+
+type Data = {
+    cookie: { value: string; expiration: number }
+    username: string
+    password: string
+}
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`)

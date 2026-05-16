@@ -239,18 +239,18 @@ export async function login(username: string, password: string, page: Page) {
     ])
 }
 
-async function updateCookie(
+export async function updateCookie(
     username: string,
     password: string,
     cookie: { value: string; expiration: number },
 ): Promise<{ value: string; expiration: number }>
-async function updateCookie(
+export async function updateCookie(
     username: string,
     password: string,
     page: Page,
     context: BrowserContext,
 ): Promise<{ value: string; expiration: number }>
-async function updateCookie(
+export async function updateCookie(
     username: string,
     password: string,
     cookiePage: { value: string; expiration: number } | Page,
