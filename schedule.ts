@@ -19,7 +19,7 @@ export async function fetchAllSchedule(date: string) {
 export async function fetchSchedule(
     user: { name: string; password: string },
     date: string,
-    cookie?: { value: string; experation: number },
+    cookie?: { value: string; expiration: number },
 ): Promise<Class[]> {
     const URL = 'https://all.uddataplus.dk/skema/?id=id_menu_skema#u:e!122922!' + date
 
@@ -63,7 +63,7 @@ export async function fetchSchedule(
             httpOnly: true,
             secure: true,
             sameSite: 'Lax',
-            expires: cookie.experation,
+            expires: cookie.expiration,
         },
     ])
 
@@ -211,8 +211,7 @@ export async function login(username: string, password: string, page: Page) {
     const count = await buttons.count()
     for (let i = 0; i < count; i++) {
         const button = buttons.nth(i)
-        const hasUniLogin = (await button.locator('img[alt="Unilogin"]').count()) > 0
-        if (hasUniLogin) {
+        if ((await button.locator('img[alt="Unilogin"]').count()) > 0) {
             await Promise.all([
                 page.waitForURL(/idp\.unilogin\.dk/u, {
                     timeout: 10_000,
@@ -243,20 +242,20 @@ export async function login(username: string, password: string, page: Page) {
 async function updateCookie(
     username: string,
     password: string,
-    cookie: { value: string; experation: number },
-): Promise<{ value: string; experation: number }>
+    cookie: { value: string; expiration: number },
+): Promise<{ value: string; expiration: number }>
 async function updateCookie(
     username: string,
     password: string,
     page: Page,
     context: BrowserContext,
-): Promise<{ value: string; experation: number }>
+): Promise<{ value: string; expiration: number }>
 async function updateCookie(
     username: string,
     password: string,
-    cookiePage: { value: string; experation: number } | Page,
+    cookiePage: { value: string; expiration: number } | Page,
     context?: BrowserContext,
-): Promise<{ value: string; experation: number }> {
+): Promise<{ value: string; expiration: number }> {
     if (context) {
         await login(username, password, cookiePage as Page)
         const newCookie = (await context.cookies()).find(c => c.name === 'utoken')
@@ -270,7 +269,7 @@ async function updateCookie(
             throw new Error("Couldn't find user")
         }
         user.cookie = {
-            experation: newCookie.expires,
+            expiration: newCookie.expires,
             value: newCookie.value,
         }
         await fs.writeFile('./data.json', JSON.stringify(data))
@@ -282,7 +281,7 @@ async function updateCookie(
         if (!user) {
             throw new Error("Couldn't find user")
         }
-        user.cookie = cookiePage as { value: string; experation: number }
+        user.cookie = cookiePage as { value: string; expiration: number }
         await fs.writeFile('./data.json', JSON.stringify(data))
         return user.cookie
     }
@@ -404,7 +403,7 @@ class Class {
 }
 
 type Data = {
-    cookie: { value: string; experation: number }
+    cookie: { value: string; expiration: number }
     username: string
     password: string
 }
